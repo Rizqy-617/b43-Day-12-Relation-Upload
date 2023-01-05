@@ -103,9 +103,51 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 
 	if session.Values["IsLogin"] != true {
 		Data.IsLogin = false
+
+		rows, errQuery := connection.Conn.Query(context.Background(), "SELECT project_name, start_date, end_date, description, technologies, image FROM tb_projects",)
+		if errQuery != nil {
+			fmt.Println("Message : " + errQuery.Error())
+			return
+		}
+
+		for rows.Next() {
+			var each = dataReceive{}
+
+			err := rows.Scan(&each.Projectname, &each.Startdate, &each.Enddate, &each.Description, &each.Technologies, &each.Image)
+			if err != nil {
+				fmt.Println("Message : " + err.Error())
+				return
+			}
+
+			each.Duration = countduration(each.Startdate, each.Enddate)
+			
+			result = append(result, each)
+		}
 	} else {
 		Data.IsLogin = session.Values["IsLogin"].(bool)
 		Data.UserName = session.Values["Name"].(string)
+
+		user := session.Values["Id"]
+
+		rows, errQuery := connection.Conn.Query(context.Background(), "SELECT tb_projects.id, project_name, start_date, end_date, description, technologies, image FROM tb_user LEFT JOIN tb_projects ON tb_projects.user_id = tb_user.id WHERE tb_projects.user_id = $1", user)
+		if errQuery != nil {
+			fmt.Println("Message : " + errQuery.Error())
+			return
+		}
+
+		for rows.Next() {
+			var each = dataReceive{}
+
+			err := rows.Scan(&each.ID, &each.Projectname, &each.Startdate, &each.Enddate, &each.Description, &each.Technologies, &each.Image)
+			if err != nil {
+				fmt.Println("Message : " + err.Error())
+				return
+			}
+
+			each.Duration = countduration(each.Startdate, each.Enddate)
+			
+			result = append(result, each)
+		}
 	}
 
 	fm := session.Flashes("message")
@@ -122,27 +164,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 
 	Data.FlashData = strings.Join(flashes, "")
 
-	user := session.Values["Id"]
-
-	rows, errQuery := connection.Conn.Query(context.Background(), "SELECT tb_projects.id, project_name, start_date, end_date, description, technologies, image FROM tb_user LEFT JOIN tb_projects ON tb_projects.user_id = tb_user.id WHERE tb_projects.user_id = $1", user)
-	if errQuery != nil {
-		fmt.Println("Message : " + errQuery.Error())
-		return
-	}
-
-	for rows.Next() {
-		var each = dataReceive{}
-
-		err := rows.Scan(&each.ID, &each.Projectname, &each.Startdate, &each.Enddate, &each.Description, &each.Technologies, &each.Image)
-		if err != nil {
-			fmt.Println("Message : " + err.Error())
-			return
-		}
-
-		each.Duration = countduration(each.Startdate, each.Enddate)
-		
-		result = append(result, each)
-	}
+	
 
 	dataCaller := map[string]interface{} {
 		"Projects": result,
